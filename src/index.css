@@ -13,20 +13,26 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* グローバル抑制 - !importantで上書きを防ぐ */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  touch-action: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* html/body 明示的指定 */
+html {
+  overscroll-behavior: none;
+  -webkit-overscroll-behavior: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   touch-action: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-html {
-  overscroll-behavior: none;
-  -webkit-overscroll-behavior: none;
 }
 
 body {
@@ -35,18 +41,25 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
-  
-  /* iPad / Touch device optimizations */
   touch-action: none;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  
-  /* Disable Apple Pencil scribble/selection */
+  /* iOS Safariでの選択抑制強化 */
   -webkit-writing-mode: horizontal-tb;
 }
 
 #root {
   width: 100%;
   height: 100vh;
+}
+
+/* Canvas専用強化 */
+canvas {
+  touch-action: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  /* iOSでの長押しメニュー完全無効化 */
+  pointer-events: auto;
 }

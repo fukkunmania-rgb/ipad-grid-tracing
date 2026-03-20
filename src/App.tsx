@@ -83,26 +83,40 @@ function App() {
 
   // Disable selection on iPad/Apple Pencil
   useEffect(() => {
-    const preventSelection = (e: Event) => {
+    const preventDefault = (e: Event) => {
       e.preventDefault();
+      e.stopPropagation();
       return false;
     };
     
     // Prevent various selection triggers
-    document.addEventListener('selectstart', preventSelection, { capture: true });
-    document.addEventListener('selectionchange', preventSelection, { capture: true });
+    document.addEventListener('selectstart', preventDefault, { capture: true });
+    document.addEventListener('selectionchange', preventDefault, { capture: true });
+    
+    // iOSコンテキストメニュー（コピーUI）抑制
+    document.addEventListener('contextmenu', preventDefault, { capture: true });
     
     // Prevent iPad specific gestures
-    document.addEventListener('gesturestart', preventSelection, { capture: true });
-    document.addEventListener('gesturechange', preventSelection, { capture: true });
-    document.addEventListener('gestureend', preventSelection, { capture: true });
+    document.addEventListener('gesturestart', preventDefault, { capture: true });
+    document.addEventListener('gesturechange', preventDefault, { capture: true });
+    document.addEventListener('gestureend', preventDefault, { capture: true });
+    
+    // iOSダブルタップズーム抑制のためのtouchイベント
+    const preventTouch = (e: TouchEvent) => {
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener('touchstart', preventTouch, { passive: false, capture: true });
     
     return () => {
-      document.removeEventListener('selectstart', preventSelection, { capture: true });
-      document.removeEventListener('selectionchange', preventSelection, { capture: true });
-      document.removeEventListener('gesturestart', preventSelection, { capture: true });
-      document.removeEventListener('gesturechange', preventSelection, { capture: true });
-      document.removeEventListener('gestureend', preventSelection, { capture: true });
+      document.removeEventListener('selectstart', preventDefault, { capture: true });
+      document.removeEventListener('selectionchange', preventDefault, { capture: true });
+      document.removeEventListener('contextmenu', preventDefault, { capture: true });
+      document.removeEventListener('gesturestart', preventDefault, { capture: true });
+      document.removeEventListener('gesturechange', preventDefault, { capture: true });
+      document.removeEventListener('gestureend', preventDefault, { capture: true });
+      document.removeEventListener('touchstart', preventTouch, { passive: false, capture: true });
     };
   }, []);
 

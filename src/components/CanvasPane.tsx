@@ -153,6 +153,7 @@ export const CanvasPane: React.FC<CanvasPaneProps> = ({
             onPointerUp={stopDrawing}
             onPointerCancel={stopDrawing}
             onPointerLeave={stopDrawing}
+            onContextMenu={(e) => e.preventDefault()}
             style={{
               position: 'absolute',
               top: 0,
@@ -160,6 +161,10 @@ export const CanvasPane: React.FC<CanvasPaneProps> = ({
               touchAction: 'none', // Prevent scrolling while drawing
               cursor: currentTool === 'pen' ? 'crosshair' : 'cell',
               zIndex: 1,
+              // iOS選択抑制
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              WebkitTouchCallout: 'none',
             }}
           />
 
