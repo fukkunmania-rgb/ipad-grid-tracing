@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: '/ipad-grid-tracing/',
   server: {
     // Allow access from iPad on same network
     host: true,
