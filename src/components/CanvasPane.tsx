@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { GridOverlay } from './GridOverlay';
 import { useCanvas } from '../hooks/useCanvas';
-import type { Tool, GridSettings, CompareSettings } from '../types';
+import type { Tool, GridSettings, CompareSettings, ImageTransform } from '../types';
 
 interface CanvasPaneProps {
   referenceImage: string | null;
@@ -11,6 +11,8 @@ interface CanvasPaneProps {
   eraserSize: number;
   gridSettings: GridSettings;
   compareSettings: CompareSettings;
+  isGrayscale: boolean;
+  imageTransform?: ImageTransform;
   containerWidth: number;
   containerHeight: number;
   onUndoAvailable: (canUndo: boolean) => void;
@@ -19,6 +21,7 @@ interface CanvasPaneProps {
   triggerRedo: boolean;
   triggerClear: boolean;
   onExportReady: (exportFn: () => string | null) => void;
+  onDrawingStart?: () => void;
 }
 
 export const CanvasPane: React.FC<CanvasPaneProps> = ({
@@ -28,7 +31,9 @@ export const CanvasPane: React.FC<CanvasPaneProps> = ({
   penSize,
   eraserSize,
   gridSettings,
+  isGrayscale,
   compareSettings,
+  imageTransform,
   containerWidth,
   containerHeight,
   onUndoAvailable,
@@ -37,8 +42,16 @@ export const CanvasPane: React.FC<CanvasPaneProps> = ({
   triggerRedo,
   triggerClear,
   onExportReady,
+  onDrawingStart,
 }) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
+  
+  // Wrap startDrawing to notify parent
+  const handleStartDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    onDrawingStart?.();
+    startDrawing(e);
+  };
+  
   const {
     canvasRef,
     startDrawing,
@@ -135,7 +148,7 @@ export const CanvasPane: React.FC<CanvasPaneProps> = ({
           {/* Drawing Canvas */}
           <canvas
             ref={canvasRef}
-            onPointerDown={startDrawing}
+            onPointerDown={handleStartDrawing}
             onPointerMove={draw}
             onPointerUp={stopDrawing}
             onPointerCancel={stopDrawing}
@@ -150,24 +163,37 @@ export const CanvasPane: React.FC<CanvasPaneProps> = ({
             }}
           />
 
-          {/* Compare Overlay */}
+          {/* Compare Overlay with same transform as reference */}
           {compareSettings.enabled && referenceImage && (
-            <img
-              src={referenceImage}
-              alt="Compare"
+            <div
               style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 width: '100%',
                 height: '100%',
-                objectFit: 'contain',
                 opacity: compareSettings.opacity,
                 pointerEvents: 'none',
                 zIndex: 5,
+                overflow: 'hidden',
               }}
-              draggable={false}
-            />
+            >
+              <img
+                src={referenceImage}
+                alt="Compare"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  filter: isGrayscale ? 'grayscale(100%)' : 'none',
+                  transform: imageTransform 
+                    ? `translate(${imageTransform.translateX}px, ${imageTransform.translateY}px) rotate(${imageTransform.rotation}deg) scale(${imageTransform.scale})`
+                    : undefined,
+                  transformOrigin: 'center center',
+                }}
+                draggable={false}
+              />
+            </div>
           )}
 
           {/* Grid Overlay */}
@@ -183,7 +209,7 @@ export const CanvasPane: React.FC<CanvasPaneProps> = ({
       {/* Tool indicator */}
       <div
         style={{
-          padding: '8px 12px',
+          padding: '6px 12px 24px 12px', // Increased bottom padding for home bar
           background: '#e9ecef',
           borderTop: '1px solid #dee2e6',
           display: 'flex',

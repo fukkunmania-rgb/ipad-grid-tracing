@@ -1,5 +1,4 @@
-import React from 'react';
-import type { Tool } from '../types';
+import type { Tool, CompareSettings } from '../types';
 
 interface ToolbarProps {
   currentTool: Tool;
@@ -10,6 +9,9 @@ interface ToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   onExport: () => void;
+  compareSettings: CompareSettings;
+  onCompareSettingsChange: (settings: CompareSettings) => void;
+  hasReferenceImage: boolean;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -21,6 +23,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   canUndo,
   canRedo,
   onExport,
+  compareSettings,
+  onCompareSettingsChange,
+  hasReferenceImage,
 }) => {
   const toolButtonStyle = (tool: Tool): React.CSSProperties => ({
     padding: '12px 20px',
@@ -71,7 +76,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
   const exportButtonStyle: React.CSSProperties = {
     padding: '12px 20px',
-    margin: '0 4px 0 16px',
+    margin: '0 4px',
     border: '2px solid #28a745',
     borderRadius: '8px',
     background: '#28a745',
@@ -83,6 +88,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     WebkitTapHighlightColor: 'transparent',
     touchAction: 'manipulation',
   };
+
+  const compareButtonStyle = (enabled: boolean): React.CSSProperties => ({
+    padding: '12px 16px',
+    margin: '0 4px',
+    border: enabled ? '2px solid #28a745' : '2px solid #ced4da',
+    borderRadius: '8px',
+    background: enabled ? '#28a745' : '#fff',
+    color: enabled ? '#fff' : '#495057',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: hasReferenceImage ? 'pointer' : 'not-allowed',
+    opacity: hasReferenceImage ? 1 : 0.5,
+    transition: 'all 0.2s',
+    WebkitTapHighlightColor: 'transparent',
+    touchAction: 'manipulation',
+  });
 
   return (
     <div
@@ -97,51 +118,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         gap: '8px',
       }}
     >
-      {/* Tool Selection */}
-      <div style={{ display: 'flex', marginRight: '16px' }}>
-        <button
-          style={toolButtonStyle('pen')}
-          onClick={() => onToolChange('pen')}
-          aria-label="ペン"
-        >
-          ✏️ ペン
-        </button>
-        <button
-          style={toolButtonStyle('eraser')}
-          onClick={() => onToolChange('eraser')}
-          aria-label="消しゴム"
-        >
-          🧽 消し
-        </button>
-      </div>
-
-      {/* History Controls */}
-      <div style={{ display: 'flex', marginRight: '16px' }}>
-        <button
-          style={actionButtonStyle(canUndo)}
-          onClick={onUndo}
-          disabled={!canUndo}
-          aria-label="元に戻す"
-        >
-          ↩️ Undo
-        </button>
-        <button
-          style={actionButtonStyle(canRedo)}
-          onClick={onRedo}
-          disabled={!canRedo}
-          aria-label="やり直し"
-        >
-          ↪️ Redo
-        </button>
-      </div>
-
-      {/* Clear */}
+      {/* Clear - Leftmost */}
       <button
         style={dangerButtonStyle}
         onClick={onClear}
         aria-label="クリア"
       >
-        🗑️ Clear
+        Clear
       </button>
 
       {/* Export */}
@@ -150,8 +133,72 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         onClick={onExport}
         aria-label="PNG保存"
       >
-        💾 保存
+        保存
       </button>
+
+      {/* Divider */}
+      <div style={{ width: '2px', height: '36px', background: '#dee2e6', margin: '0 8px' }} />
+
+      {/* History Controls - Middle-right */}
+      <div style={{ display: 'flex', marginRight: '8px' }}>
+        <button
+          style={actionButtonStyle(canUndo)}
+          onClick={onUndo}
+          disabled={!canUndo}
+          aria-label="元に戻す"
+        >
+          Undo
+        </button>
+        <button
+          style={actionButtonStyle(canRedo)}
+          onClick={onRedo}
+          disabled={!canRedo}
+          aria-label="やり直し"
+        >
+          Redo
+        </button>
+      </div>
+
+      {/* Divider */}
+      <div style={{ width: '2px', height: '36px', background: '#dee2e6', margin: '0 8px' }} />
+
+      {/* Compare Button - Middle */}
+      <button
+        style={compareButtonStyle(compareSettings.enabled)}
+        onClick={() => {
+          if (hasReferenceImage) {
+            onCompareSettingsChange({
+              ...compareSettings,
+              enabled: !compareSettings.enabled,
+            });
+          }
+        }}
+        disabled={!hasReferenceImage}
+        aria-label="比較"
+      >
+        比較
+      </button>
+
+      {/* Divider */}
+      <div style={{ width: '2px', height: '36px', background: '#dee2e6', margin: '0 8px' }} />
+
+      {/* Tool Selection - Rightmost */}
+      <div style={{ display: 'flex' }}>
+        <button
+          style={toolButtonStyle('pen')}
+          onClick={() => onToolChange('pen')}
+          aria-label="ペン"
+        >
+          ペン
+        </button>
+        <button
+          style={toolButtonStyle('eraser')}
+          onClick={() => onToolChange('eraser')}
+          aria-label="消しゴム"
+        >
+          消し
+        </button>
+      </div>
     </div>
   );
 };

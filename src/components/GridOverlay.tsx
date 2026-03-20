@@ -1,4 +1,4 @@
-import React from 'react';
+import { GRID_COLORS } from '../types';
 import type { GridSettings } from '../types';
 
 interface GridOverlayProps {
@@ -16,15 +16,28 @@ export const GridOverlay: React.FC<GridOverlayProps> = ({
 }) => {
   if (!settings.enabled) return null;
 
-  const { divisions, color } = settings;
+  const { multiplier, colorKey } = settings;
+  const color = GRID_COLORS[colorKey];
   
-  // Calculate grid lines
+  // Base 4x5 grid scaled by multiplier
+  const baseX = 4;
+  const baseY = 5;
+  const divisionsX = baseX * multiplier;
+  const divisionsY = baseY * multiplier;
+  
+  // Calculate main grid lines (solid)
   const verticalLines = [];
   const horizontalLines = [];
   
-  for (let i = 1; i < divisions; i++) {
-    const x = (width / divisions) * i;
-    const y = (height / divisions) * i;
+  // Calculate sub grid lines (dashed)
+  const subDivisionsX = divisionsX * 2;
+  const subDivisionsY = divisionsY * 2;
+  const subVerticalLines = [];
+  const subHorizontalLines = [];
+  
+  // Main vertical lines (X divisions)
+  for (let i = 1; i < divisionsX; i++) {
+    const x = (width / divisionsX) * i;
     
     verticalLines.push(
       <line
@@ -34,9 +47,14 @@ export const GridOverlay: React.FC<GridOverlayProps> = ({
         x2={x}
         y2={height}
         stroke={color}
-        strokeWidth={1}
+        strokeWidth={2}
       />
     );
+  }
+  
+  // Main horizontal lines (Y divisions)
+  for (let i = 1; i < divisionsY; i++) {
+    const y = (height / divisionsY) * i;
     
     horizontalLines.push(
       <line
@@ -46,7 +64,49 @@ export const GridOverlay: React.FC<GridOverlayProps> = ({
         x2={width}
         y2={y}
         stroke={color}
-        strokeWidth={1}
+        strokeWidth={2}
+      />
+    );
+  }
+  
+  // Sub vertical lines
+  for (let i = 1; i < subDivisionsX; i++) {
+    if (i % 2 === 0) continue;
+    
+    const x = (width / subDivisionsX) * i;
+    
+    subVerticalLines.push(
+      <line
+        key={`sv-${i}`}
+        x1={x}
+        y1={0}
+        x2={x}
+        y2={height}
+        stroke={color}
+        strokeWidth={2.5}
+        strokeDasharray="4,4"
+        opacity={0.6}
+      />
+    );
+  }
+  
+  // Sub horizontal lines
+  for (let i = 1; i < subDivisionsY; i++) {
+    if (i % 2 === 0) continue;
+    
+    const y = (height / subDivisionsY) * i;
+    
+    subHorizontalLines.push(
+      <line
+        key={`sh-${i}`}
+        x1={0}
+        y1={y}
+        x2={width}
+        y2={y}
+        stroke={color}
+        strokeWidth={2.5}
+        strokeDasharray="4,4"
+        opacity={0.6}
       />
     );
   }
@@ -72,8 +132,14 @@ export const GridOverlay: React.FC<GridOverlayProps> = ({
         height={height}
         fill="none"
         stroke={color}
-        strokeWidth={2}
+        strokeWidth={3}
       />
+      
+      {/* Sub grid lines (dashed, behind main lines) */}
+      {subVerticalLines}
+      {subHorizontalLines}
+      
+      {/* Main grid lines (solid) */}
       {verticalLines}
       {horizontalLines}
     </svg>

@@ -3,12 +3,12 @@ import { Toolbar } from './components/Toolbar';
 import { ReferencePane } from './components/ReferencePane';
 import { CanvasPane } from './components/CanvasPane';
 import { SettingsPanel } from './components/SettingsPanel';
-import type { Tool, GridSettings, CompareSettings } from './types';
+import type { Tool, GridSettings, CompareSettings, ImageTransform } from './types';
 import './App.css';
 
-// Default sizes for iPad landscape
-const DEFAULT_CANVAS_WIDTH = 500;
-const DEFAULT_CANVAS_HEIGHT = 600;
+// Fixed canvas size - maximum size with minimal margins
+const FIXED_CANVAS_WIDTH = 640;
+const FIXED_CANVAS_HEIGHT = 800; // 4:5 ratio
 
 function App() {
   // Image state
@@ -20,11 +20,11 @@ function App() {
   const [penSize, setPenSize] = useState(4);
   const [eraserSize] = useState(20);
 
-  // Grid settings
+  // Grid settings - 4x5 grid base with multiplier
   const [gridSettings, setGridSettings] = useState<GridSettings>({
     enabled: true,
-    divisions: 4,
-    color: 'rgba(255, 0, 0, 0.4)',
+    multiplier: 1, // 1=4x5, 2=8x10, 3=12x15, 4=16x20
+    colorKey: 'red',
   });
 
   // Compare settings
@@ -32,6 +32,25 @@ function App() {
     enabled: false,
     opacity: 0.5,
   });
+
+  // Grayscale state - shared between reference and compare overlay
+  const [isGrayscale, setIsGrayscale] = useState(false);
+
+  // Image transform state (for reference pane)
+  const [imageTransform, setImageTransform] = useState<ImageTransform>({
+    scale: 1,
+    rotation: 0,
+    translateX: 0,
+    translateY: 0,
+  });
+
+  // Lock state - manual control for reference position editing
+  const [isPositionLocked, setIsPositionLocked] = useState(false);
+
+  // Toggle lock function
+  const togglePositionLock = useCallback(() => {
+    setIsPositionLocked(prev => !prev);
+  }, []);
 
   // Undo/Redo state from canvas
   const [canUndo, setCanUndo] = useState(false);
@@ -45,10 +64,10 @@ function App() {
   // Export function reference
   const exportFnRef = useRef<(() => string | null) | null>(null);
 
-  // Canvas container size
+  // Canvas container size - fixed size regardless of grid multiplier
   const [canvasSize, setCanvasSize] = useState({
-    width: DEFAULT_CANVAS_WIDTH,
-    height: DEFAULT_CANVAS_HEIGHT,
+    width: FIXED_CANVAS_WIDTH,
+    height: FIXED_CANVAS_HEIGHT,
   });
 
   // Listen for pen size changes from settings panel
@@ -62,19 +81,29 @@ function App() {
     };
   }, []);
 
-  // Adjust canvas size based on viewport
+  // Adjust canvas size based on viewport - fixed size regardless of grid multiplier
   useEffect(() => {
     const updateSize = () => {
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       
-      // Reserve space for toolbar (60px) and settings panel (80px)
-      const availableHeight = viewportHeight - 140;
-      const paneWidth = (viewportWidth / 2) - 48; // 48px for padding
+      // Minimize reserved space - almost no margins
+      const availableHeight = viewportHeight - 50; // minimal toolbar+settings height
+      const paneWidth = (viewportWidth / 2) - 4; // 4px total padding (2px each side)
       
+      // Calculate max size that fits in available space (maintaining 4:5 ratio)
+      let width = Math.min(paneWidth, FIXED_CANVAS_WIDTH);
+      let height = width * 5 / 4;
+      
+      if (height > availableHeight) {
+        height = Math.min(availableHeight, FIXED_CANVAS_HEIGHT);
+        width = height * 4 / 5;
+      }
+      
+      // Canvas size is fixed - doesn't change with grid multiplier
       setCanvasSize({
-        width: Math.min(paneWidth, 600),
-        height: Math.min(availableHeight, 700),
+        width: Math.floor(width),
+        height: Math.floor(height),
       });
     };
 
@@ -135,6 +164,19 @@ function App() {
         canUndo={canUndo}
         canRedo={canRedo}
         onExport={handleExport}
+        compareSettings={compareSettings}
+        onCompareSettingsChange={setCompareSettings}
+        hasReferenceImage={!!referenceImage}
+      />
+
+      {/* Settings Panel - Moved to top to avoid home bar interference */}
+      <SettingsPanel
+        gridSettings={gridSettings}
+        onGridSettingsChange={setGridSettings}
+        compareSettings={compareSettings}
+        onCompareSettingsChange={setCompareSettings}
+        hasReferenceImage={!!referenceImage}
+        currentPenSize={penSize}
       />
 
       {/* Main Workspace */}
@@ -151,6 +193,12 @@ function App() {
           gridSettings={gridSettings}
           containerWidth={canvasSize.width}
           containerHeight={canvasSize.height}
+          isGrayscale={isGrayscale}
+          onGrayscaleChange={setIsGrayscale}
+          transform={imageTransform}
+          onTransformChange={setImageTransform}
+          isLocked={isPositionLocked}
+          onLockToggle={togglePositionLock}
         />
 
         <CanvasPane
@@ -161,6 +209,8 @@ function App() {
           eraserSize={eraserSize}
           gridSettings={gridSettings}
           compareSettings={compareSettings}
+          isGrayscale={isGrayscale}
+          imageTransform={imageTransform}
           containerWidth={canvasSize.width}
           containerHeight={canvasSize.height}
           onUndoAvailable={setCanUndo}
@@ -169,17 +219,10 @@ function App() {
           triggerRedo={redoTrigger}
           triggerClear={clearTrigger}
           onExportReady={handleExportReady}
+
         />
       </div>
 
-      {/* Settings Panel */}
-      <SettingsPanel
-        gridSettings={gridSettings}
-        onGridSettingsChange={setGridSettings}
-        compareSettings={compareSettings}
-        onCompareSettingsChange={setCompareSettings}
-        hasReferenceImage={!!referenceImage}
-      />
     </div>
   );
 }

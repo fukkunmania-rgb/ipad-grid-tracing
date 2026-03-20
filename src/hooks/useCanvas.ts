@@ -46,6 +46,7 @@ export function useCanvas(
       ctx.scale(dpr, dpr);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+      ctx.setLineDash([]); // Ensure solid lines (not dashed)
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       contextRef.current = ctx;
@@ -136,9 +137,14 @@ export function useCanvas(
     };
   }, []);
 
-  // Start drawing
+
+
+  // Start drawing - Only allow Apple Pencil (pen) and mouse, reject finger touch
   const startDrawing = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.button !== 0) return; // Only left click/main pointer
+    
+    // Reject finger touch - only allow pen (Apple Pencil) or mouse
+    if (e.pointerType === 'touch') return;
     
     e.preventDefault();
     const canvas = canvasRef.current;
@@ -150,30 +156,46 @@ export function useCanvas(
     const point = getCoordinates(e);
     lastPointRef.current = point;
 
-    // Draw a single dot if it's just a tap
+    // Set up context for drawing
     const ctx = contextRef.current;
     if (ctx) {
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, getCurrentSize() / 2, 0, Math.PI * 2);
-      ctx.fillStyle = currentTool === 'eraser' ? 'rgba(0,0,0,1)' : penColor;
-      ctx.fill();
+      const size = getCurrentSize();
       
+      // Set composite operation first
       if (currentTool === 'eraser') {
         ctx.globalCompositeOperation = 'destination-out';
       } else {
         ctx.globalCompositeOperation = 'source-over';
       }
+      
+      // Start a new path for continuous drawing
+      ctx.beginPath();
+      ctx.setLineDash([]);
+      ctx.moveTo(point.x, point.y);
+      
+      // Draw a single dot - use exact size without pressure for the initial dot
+      ctx.arc(point.x, point.y, size / 2, 0, Math.PI * 2);
+      ctx.fillStyle = currentTool === 'eraser' ? 'rgba(0,0,0,1)' : penColor;
+      ctx.fill();
+      
+      // Reset path for line drawing
+      ctx.beginPath();
+      ctx.moveTo(point.x, point.y);
     }
-  }, [currentTool, penColor, getCoordinates]);
+  }, [currentTool, penColor, eraserSize, penSize, getCoordinates]);
 
   // Get current tool size
   const getCurrentSize = useCallback(() => {
     return currentTool === 'eraser' ? eraserSize : penSize;
   }, [currentTool, eraserSize, penSize]);
 
-  // Draw
+  // Draw - Only allow Apple Pencil (pen) and mouse, reject finger touch
   const draw = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return;
+    
+    // Reject finger touch during drawing
+    if (e.pointerType === 'touch') return;
+    
     e.preventDefault();
 
     const ctx = contextRef.current;
@@ -197,16 +219,13 @@ export function useCanvas(
     ctx.lineWidth = lineWidth;
     ctx.strokeStyle = penColor;
 
-    // Draw smooth line
-    ctx.beginPath();
-    ctx.moveTo(lastPoint.x, lastPoint.y);
-    
-    // Use quadratic curve for smoother lines
-    const midX = (lastPoint.x + point.x) / 2;
-    const midY = (lastPoint.y + point.y) / 2;
-    ctx.quadraticCurveTo(lastPoint.x, lastPoint.y, midX, midY);
-    
+    // Continue the path without beginPath/stroke for smoother lines
+    ctx.lineTo(point.x, point.y);
     ctx.stroke();
+    
+    // Move the starting point for next segment to avoid overlap buildup
+    ctx.beginPath();
+    ctx.moveTo(point.x, point.y);
 
     lastPointRef.current = point;
   }, [currentTool, penColor, getCurrentSize, getCoordinates]);
