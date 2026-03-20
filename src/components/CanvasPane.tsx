@@ -154,7 +154,6 @@ export const CanvasPane: React.FC<CanvasPaneProps> = ({
             onPointerCancel={stopDrawing}
             onPointerLeave={stopDrawing}
             onContextMenu={(e) => e.preventDefault()}
-            onSelectStart={(e) => e.preventDefault()}
             onTouchStart={(e: React.TouchEvent) => {
               // iOS長押し選択を防ぐ
               e.preventDefault();
@@ -171,7 +170,6 @@ export const CanvasPane: React.FC<CanvasPaneProps> = ({
               userSelect: 'none',
               WebkitUserSelect: 'none',
               WebkitTouchCallout: 'none',
-              webkitUserDrag: 'none',
             }}
           />
 

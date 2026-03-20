@@ -408,7 +408,7 @@ export const ReferencePane: React.FC<ReferencePaneProps> = ({
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                   WebkitTouchCallout: 'none',
-                  webkitUserDrag: 'none',
+
                 }}
                 draggable={false}
               />
