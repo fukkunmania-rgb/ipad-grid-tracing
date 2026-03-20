@@ -107,7 +107,8 @@ function App() {
         e.preventDefault();
       }
     };
-    document.addEventListener('touchstart', preventTouch, { passive: false, capture: true });
+    const passiveOption: AddEventListenerOptions = { passive: false, capture: true };
+    document.addEventListener('touchstart', preventTouch, passiveOption);
     
     return () => {
       document.removeEventListener('selectstart', preventDefault, { capture: true });
@@ -116,7 +117,7 @@ function App() {
       document.removeEventListener('gesturestart', preventDefault, { capture: true });
       document.removeEventListener('gesturechange', preventDefault, { capture: true });
       document.removeEventListener('gestureend', preventDefault, { capture: true });
-      document.removeEventListener('touchstart', preventTouch, { passive: false, capture: true });
+      document.removeEventListener('touchstart', preventTouch, passiveOption);
     };
   }, []);
 
