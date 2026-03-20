@@ -81,6 +81,31 @@ function App() {
     };
   }, []);
 
+  // Disable selection on iPad/Apple Pencil
+  useEffect(() => {
+    const preventSelection = (e: Event) => {
+      e.preventDefault();
+      return false;
+    };
+    
+    // Prevent various selection triggers
+    document.addEventListener('selectstart', preventSelection, { capture: true });
+    document.addEventListener('selectionchange', preventSelection, { capture: true });
+    
+    // Prevent iPad specific gestures
+    document.addEventListener('gesturestart', preventSelection, { capture: true });
+    document.addEventListener('gesturechange', preventSelection, { capture: true });
+    document.addEventListener('gestureend', preventSelection, { capture: true });
+    
+    return () => {
+      document.removeEventListener('selectstart', preventSelection, { capture: true });
+      document.removeEventListener('selectionchange', preventSelection, { capture: true });
+      document.removeEventListener('gesturestart', preventSelection, { capture: true });
+      document.removeEventListener('gesturechange', preventSelection, { capture: true });
+      document.removeEventListener('gestureend', preventSelection, { capture: true });
+    };
+  }, []);
+
   // Adjust canvas size based on viewport - fixed size regardless of grid multiplier
   useEffect(() => {
     const updateSize = () => {
