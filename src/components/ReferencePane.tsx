@@ -338,6 +338,7 @@ export const ReferencePane: React.FC<ReferencePaneProps> = ({
           touchAction: 'none',
           userSelect: 'none',
           WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
         }}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -346,6 +347,7 @@ export const ReferencePane: React.FC<ReferencePaneProps> = ({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        onContextMenu={(e: React.MouseEvent) => e.preventDefault()}
       >
         {/* Gesture hint - absolute positioned to avoid layout shift */}
         {image && !isLocked && (
@@ -403,6 +405,10 @@ export const ReferencePane: React.FC<ReferencePaneProps> = ({
                   display: 'block',
                   filter: isGrayscale ? 'grayscale(100%)' : 'none',
                   pointerEvents: 'none',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  WebkitTouchCallout: 'none',
+                  webkitUserDrag: 'none',
                 }}
                 draggable={false}
               />

@@ -81,7 +81,7 @@ function App() {
     };
   }, []);
 
-  // Disable selection on iPad/Apple Pencil
+  // Disable selection on iPad/Apple Pencil - 徹底版
   useEffect(() => {
     const preventDefault = (e: Event) => {
       e.preventDefault();
@@ -89,9 +89,24 @@ function App() {
       return false;
     };
     
+    // 選択範囲を強制クリアする関数
+    const clearSelection = () => {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        selection.removeAllRanges();
+      }
+      // iOS Safari対策：document.bodyをblur
+      if (document.activeElement && document.activeElement !== document.body) {
+        (document.activeElement as HTMLElement).blur();
+      }
+    };
+    
     // Prevent various selection triggers
     document.addEventListener('selectstart', preventDefault, { capture: true });
-    document.addEventListener('selectionchange', preventDefault, { capture: true });
+    document.addEventListener('selectionchange', (e) => {
+      clearSelection();
+      preventDefault(e);
+    }, { capture: true });
     
     // iOSコンテキストメニュー（コピーUI）抑制
     document.addEventListener('contextmenu', preventDefault, { capture: true });
@@ -101,14 +116,27 @@ function App() {
     document.addEventListener('gesturechange', preventDefault, { capture: true });
     document.addEventListener('gestureend', preventDefault, { capture: true });
     
-    // iOSダブルタップズーム抑制のためのtouchイベント
-    const preventTouch = (e: TouchEvent) => {
+    // iOS長押しメニュー（callout）を完全に無効化
+    const handleTouchStart = (e: TouchEvent) => {
+      // 長押しによる選択を防ぐ
+      clearSelection();
       if (e.touches.length > 1) {
         e.preventDefault();
       }
     };
+    
+    const handleTouchEnd = () => {
+      // タッチ終了時も選択をクリア
+      clearSelection();
+    };
+    
     // @ts-ignore - GitHub ActionsのTypeScriptバージョン互換性のため
-    document.addEventListener('touchstart', preventTouch, { passive: false, capture: true });
+    document.addEventListener('touchstart', handleTouchStart, { passive: false, capture: true });
+    // @ts-ignore
+    document.addEventListener('touchend', handleTouchEnd, { passive: false, capture: true });
+    
+    // 定期的に選択をクリア（iOSの予防的選択対策）
+    const intervalId = setInterval(clearSelection, 100);
     
     return () => {
       document.removeEventListener('selectstart', preventDefault, { capture: true });
@@ -117,8 +145,11 @@ function App() {
       document.removeEventListener('gesturestart', preventDefault, { capture: true });
       document.removeEventListener('gesturechange', preventDefault, { capture: true });
       document.removeEventListener('gestureend', preventDefault, { capture: true });
-      // @ts-ignore - GitHub ActionsのTypeScriptバージョン互換性のため
-      document.removeEventListener('touchstart', preventTouch, { passive: false, capture: true });
+      // @ts-ignore
+      document.removeEventListener('touchstart', handleTouchStart, { passive: false, capture: true });
+      // @ts-ignore
+      document.removeEventListener('touchend', handleTouchEnd, { passive: false, capture: true });
+      clearInterval(intervalId);
     };
   }, []);
 

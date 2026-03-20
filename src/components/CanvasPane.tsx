@@ -154,6 +154,12 @@ export const CanvasPane: React.FC<CanvasPaneProps> = ({
             onPointerCancel={stopDrawing}
             onPointerLeave={stopDrawing}
             onContextMenu={(e) => e.preventDefault()}
+            onSelectStart={(e) => e.preventDefault()}
+            onTouchStart={(e: React.TouchEvent) => {
+              // iOS長押し選択を防ぐ
+              e.preventDefault();
+              window.getSelection()?.removeAllRanges();
+            }}
             style={{
               position: 'absolute',
               top: 0,
@@ -161,10 +167,11 @@ export const CanvasPane: React.FC<CanvasPaneProps> = ({
               touchAction: 'none', // Prevent scrolling while drawing
               cursor: currentTool === 'pen' ? 'crosshair' : 'cell',
               zIndex: 1,
-              // iOS選択抑制
+              // iOS選択抑制 - 全プロパティ
               userSelect: 'none',
               WebkitUserSelect: 'none',
               WebkitTouchCallout: 'none',
+              webkitUserDrag: 'none',
             }}
           />
 
