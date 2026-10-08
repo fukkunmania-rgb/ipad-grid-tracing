@@ -1,4 +1,4 @@
-import { PAPER_WIDTH, PAPER_HEIGHT, EXPORT_WIDTH, EXPORT_HEIGHT } from '../types/index.js';
+import { PAPER_WIDTH, EXPORT_WIDTH, EXPORT_HEIGHT } from '../types/index.js';
 import type { Stroke, HistoryStatus, ExportBackground, Point } from '../types/index.js';
 
 type Command = { kind: 'stroke'; stroke: Stroke } | { kind: 'clear' };
@@ -34,32 +34,32 @@ export class DrawingHistory {
   reset() { this.commands = []; this.cursor = 0; }
 }
 
-function setBrush(ctx: CanvasRenderingContext2D, stroke: Stroke) {
+function setBrush(ctx: CanvasRenderingContext2D, stroke: Stroke, scale: number) {
   ctx.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.lineWidth = stroke.size; // Deliberately constant; pressure is not read.
+  ctx.lineWidth = stroke.size * scale; // Fixed document width; pressure is never read.
   ctx.strokeStyle = stroke.color;
   ctx.fillStyle = stroke.color;
 }
-export function drawSegment(ctx: CanvasRenderingContext2D, stroke: Stroke, a: Point, b: Point) {
-  setBrush(ctx, stroke);
+export function drawSegment(ctx: CanvasRenderingContext2D, stroke: Stroke, a: Point, b: Point, scale = 1) {
+  setBrush(ctx, stroke, scale);
   ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
-  ctx.lineTo(b.x, b.y);
+  ctx.moveTo(a.x * scale, a.y * scale);
+  ctx.lineTo(b.x * scale, b.y * scale);
   ctx.stroke();
 }
-export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
+export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke, scale = 1) {
   if (!stroke.points.length) return;
-  setBrush(ctx, stroke);
+  setBrush(ctx, stroke, scale);
   ctx.beginPath();
   const first = stroke.points[0];
   if (stroke.points.length === 1) {
-    ctx.arc(first.x, first.y, stroke.size / 2, 0, Math.PI * 2);
+    ctx.arc(first.x * scale, first.y * scale, stroke.size * scale / 2, 0, Math.PI * 2);
     ctx.fill();
   } else {
-    ctx.moveTo(first.x, first.y);
-    for (const point of stroke.points.slice(1)) ctx.lineTo(point.x, point.y);
+    ctx.moveTo(first.x * scale, first.y * scale);
+    for (const point of stroke.points.slice(1)) ctx.lineTo(point.x * scale, point.y * scale);
     ctx.stroke();
   }
 }
@@ -68,8 +68,10 @@ export function renderDrawing(canvas: HTMLCanvasElement, strokes: Stroke[]) {
   if (!ctx) throw new Error('描画用Canvasを作成できない');
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.setTransform(canvas.width / PAPER_WIDTH, 0, 0, canvas.height / PAPER_HEIGHT, 0, 0);
-  for (const stroke of strokes) drawStroke(ctx, stroke);
+  // Map document -> bitmap explicitly, exactly once. Keep the context transform
+  // at identity for both live ink and replay; this also avoids WebKit path scaling differences.
+  const scale = canvas.width / PAPER_WIDTH;
+  for (const stroke of strokes) drawStroke(ctx, stroke, scale);
   ctx.globalCompositeOperation = 'source-over';
   return ctx;
 }
@@ -87,7 +89,7 @@ export async function exportDrawing(strokes: Stroke[], background: ExportBackgro
     // Fill AFTER erasing, underneath the ink, so erased areas remain white.
     ctx.globalCompositeOperation = 'destination-over';
     ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, PAPER_WIDTH, PAPER_HEIGHT);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = 'source-over';
   }
   return canvasBlob(canvas);

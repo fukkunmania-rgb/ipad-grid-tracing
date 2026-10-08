@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { CanvasHandle, HistoryStatus, Stroke, Tool, ExportBackground } from '../types';
 import { DrawingHistory, drawSegment, drawStroke, exportDrawing, renderDrawing } from '../lib/drawing';
+import { PAPER_WIDTH, PAPER_HEIGHT } from '../types';
 import { toDocumentPoint } from '../lib/geometry';
 
 interface Options {
@@ -25,14 +26,16 @@ export function useCanvas({ width, height, tool, penSize, eraserSize, initialStr
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const w = Math.max(1, Math.round(width * dpr));
-    const h = Math.max(1, Math.round(height * dpr));
+    // Preserve exact 4:5 bitmap dimensions, so one uniform scale covers both axes.
+    const paperScale = Math.min(width / PAPER_WIDTH, height / PAPER_HEIGHT);
+    const unit = Math.max(1, Math.ceil(PAPER_WIDTH * paperScale * dpr / 4));
+    const w = unit * 4, h = unit * 5;
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
     }
     const ctx = renderDrawing(canvas, history.getStrokes());
-    if (activeRef.current) drawStroke(ctx, activeRef.current.stroke);
+    if (activeRef.current) drawStroke(ctx, activeRef.current.stroke, canvas.width / PAPER_WIDTH);
   }, [width, height, history]);
 
   useLayoutEffect(() => { redraw(); }, [redraw]);
@@ -61,7 +64,7 @@ export function useCanvas({ width, height, tool, penSize, eraserSize, initialStr
       const last = active.stroke.points[active.stroke.points.length - 1];
       if (point.x === last.x && point.y === last.y) continue;
       active.stroke.points.push(point);
-      drawSegment(ctx, active.stroke, last, point);
+      drawSegment(ctx, active.stroke, last, point, canvas.width / PAPER_WIDTH);
     }
   }, []);
 
@@ -97,7 +100,7 @@ export function useCanvas({ width, height, tool, penSize, eraserSize, initialStr
     const stroke: Stroke = { tool, size: tool === 'pen' ? penSize : eraserSize, color: '#000000', points: [point] };
     activeRef.current = { pointerId: event.pointerId, stroke };
     const ctx = canvas.getContext('2d');
-    if (ctx) drawStroke(ctx, stroke);
+    if (ctx) drawStroke(ctx, stroke, canvas.width / PAPER_WIDTH);
     onStart();
   };
   const draw = (event: ReactPointerEvent<HTMLCanvasElement>) => {
