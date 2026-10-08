@@ -1,281 +1,123 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
-import type { Tool, Point } from '../types';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { CanvasHandle, HistoryStatus, Stroke, Tool, ExportBackground } from '../types';
+import { DrawingHistory, drawSegment, drawStroke, exportDrawing, renderDrawing } from '../lib/drawing';
+import { toDocumentPoint } from '../lib/geometry';
 
-const MAX_HISTORY = 30;
+interface Options {
+  width: number;
+  height: number;
+  tool: Tool;
+  penSize: number;
+  eraserSize: number;
+  initialStrokes: Stroke[];
+  onChange: (strokes: Stroke[], status: HistoryStatus) => void;
+  onStart: () => void;
+}
+interface ActiveStroke { pointerId: number; stroke: Stroke }
 
-export function useCanvas(
-  width: number,
-  height: number,
-  currentTool: Tool,
-  penColor: string,
-  penSize: number,
-  eraserSize: number
-) {
+export function useCanvas({ width, height, tool, penSize, eraserSize, initialStrokes, onChange, onStart }: Options) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
-  const isDrawingRef = useRef(false);
-  const lastPointRef = useRef<Point | null>(null);
-  
-  // History for Undo/Redo
-  const historyRef = useRef<ImageData[]>([]);
-  const historyIndexRef = useRef(-1);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
+  const activeRef = useRef<ActiveStroke | null>(null);
+  const [history] = useState(() => new DrawingHistory(initialStrokes));
 
-  // Initialize canvas with retina support
-  const initCanvas = useCallback(() => {
+  const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    
-    // Set actual canvas size (internal resolution)
-    canvas.width = Math.floor(width * dpr);
-    canvas.height = Math.floor(height * dpr);
-    
-    // Set CSS display size
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-
-    const ctx = canvas.getContext('2d', {
-      alpha: true,
-      desynchronized: true, // Low latency rendering hint
-    });
-    
-    if (ctx) {
-      ctx.scale(dpr, dpr);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.setLineDash([]); // Ensure solid lines (not dashed)
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      contextRef.current = ctx;
-      
-      // Save initial blank state
-      saveState();
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const w = Math.max(1, Math.round(width * dpr));
+    const h = Math.max(1, Math.round(height * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
     }
-  }, [width, height]);
+    const ctx = renderDrawing(canvas, history.getStrokes());
+    if (activeRef.current) drawStroke(ctx, activeRef.current.stroke);
+  }, [width, height, history]);
 
-  // Save current state to history
-  const saveState = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = contextRef.current;
-    if (!canvas || !ctx) return;
-
-    // Remove any redo states
-    if (historyIndexRef.current < historyRef.current.length - 1) {
-      historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
-    }
-
-    // Save current state
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    historyRef.current.push(imageData);
-
-    // Limit history size
-    if (historyRef.current.length > MAX_HISTORY) {
-      historyRef.current.shift();
-    } else {
-      historyIndexRef.current++;
-    }
-
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(false);
-  }, []);
-
-  // Undo
-  const undo = useCallback(() => {
-    if (historyIndexRef.current <= 0) return;
-    
-    const canvas = canvasRef.current;
-    const ctx = contextRef.current;
-    if (!canvas || !ctx) return;
-
-    historyIndexRef.current--;
-    const imageData = historyRef.current[historyIndexRef.current];
-    ctx.putImageData(imageData, 0, 0);
-    
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
-  }, []);
-
-  // Redo
-  const redo = useCallback(() => {
-    if (historyIndexRef.current >= historyRef.current.length - 1) return;
-    
-    const canvas = canvasRef.current;
-    const ctx = contextRef.current;
-    if (!canvas || !ctx) return;
-
-    historyIndexRef.current++;
-    const imageData = historyRef.current[historyIndexRef.current];
-    ctx.putImageData(imageData, 0, 0);
-    
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
-  }, []);
-
-  // Clear canvas
-  const clear = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = contextRef.current;
-    if (!canvas || !ctx) return;
-
-    ctx.clearRect(0, 0, width, height);
-    saveState();
-  }, [width, height, saveState]);
-
-  // Get coordinates from pointer event
-  const getCoordinates = useCallback((e: React.PointerEvent<HTMLCanvasElement>): Point => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-      pressure: e.pressure !== 0.5 ? e.pressure : undefined,
-    };
-  }, []);
-
-
-
-  // Start drawing - Only allow Apple Pencil (pen) and mouse, reject finger touch
-  const startDrawing = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.button !== 0) return; // Only left click/main pointer
-    
-    // Reject finger touch - only allow pen (Apple Pencil) or mouse
-    if (e.pointerType === 'touch') return;
-    
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    canvas.setPointerCapture(e.pointerId);
-    isDrawingRef.current = true;
-    
-    const point = getCoordinates(e);
-    lastPointRef.current = point;
-
-    // Set up context for drawing
-    const ctx = contextRef.current;
-    if (ctx) {
-      const size = getCurrentSize();
-      
-      // Set composite operation first
-      if (currentTool === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
-      } else {
-        ctx.globalCompositeOperation = 'source-over';
-      }
-      
-      // Start a new path for continuous drawing
-      ctx.beginPath();
-      ctx.setLineDash([]);
-      ctx.moveTo(point.x, point.y);
-      
-      // Draw a single dot - use exact size without pressure for the initial dot
-      ctx.arc(point.x, point.y, size / 2, 0, Math.PI * 2);
-      ctx.fillStyle = currentTool === 'eraser' ? 'rgba(0,0,0,1)' : penColor;
-      ctx.fill();
-      
-      // Reset path for line drawing
-      ctx.beginPath();
-      ctx.moveTo(point.x, point.y);
-    }
-  }, [currentTool, penColor, eraserSize, penSize, getCoordinates]);
-
-  // Get current tool size
-  const getCurrentSize = useCallback(() => {
-    return currentTool === 'eraser' ? eraserSize : penSize;
-  }, [currentTool, eraserSize, penSize]);
-
-  // Draw - Only allow Apple Pencil (pen) and mouse, reject finger touch
-  const draw = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current) return;
-    
-    // Reject finger touch during drawing
-    if (e.pointerType === 'touch') return;
-    
-    e.preventDefault();
-
-    const ctx = contextRef.current;
-    const lastPoint = lastPointRef.current;
-    if (!ctx || !lastPoint) return;
-
-    const point = getCoordinates(e);
-    
-    // Set composite operation
-    if (currentTool === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-    } else {
-      ctx.globalCompositeOperation = 'source-over';
-    }
-
-    // Calculate line width based on pressure (Apple Pencil support)
-    const pressure = point.pressure || 1;
-    const baseSize = getCurrentSize();
-    const lineWidth = baseSize * (0.5 + pressure * 0.5);
-
-    ctx.lineWidth = lineWidth;
-    ctx.strokeStyle = penColor;
-
-    // Continue the path without beginPath/stroke for smoother lines
-    ctx.lineTo(point.x, point.y);
-    ctx.stroke();
-    
-    // Move the starting point for next segment to avoid overlap buildup
-    ctx.beginPath();
-    ctx.moveTo(point.x, point.y);
-
-    lastPointRef.current = point;
-  }, [currentTool, penColor, getCurrentSize, getCoordinates]);
-
-  // Stop drawing
-  const stopDrawing = useCallback((e?: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current) return;
-    
-    isDrawingRef.current = false;
-    lastPointRef.current = null;
-    
-    const ctx = contextRef.current;
-    if (ctx) {
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    
-    saveState();
-    
-    if (e) {
-      const canvas = canvasRef.current;
-      if (canvas) {
-        canvas.releasePointerCapture(e.pointerId);
-      }
-    }
-  }, [saveState]);
-
-  // Export canvas as PNG
-  const exportPNG = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    
-    return canvas.toDataURL('image/png');
-  }, []);
-
-  // Initialize on mount
+  useLayoutEffect(() => { redraw(); }, [redraw]);
   useEffect(() => {
-    initCanvas();
-  }, [initCanvas]);
+    window.addEventListener('resize', redraw);
+    return () => window.removeEventListener('resize', redraw);
+  }, [redraw]);
 
-  return {
-    canvasRef,
-    contextRef,
-    startDrawing,
-    draw,
-    stopDrawing,
-    undo,
-    redo,
-    clear,
-    canUndo,
-    canRedo,
-    exportPNG,
+  const notify = useCallback(() => {
+    redraw();
+    onChange(history.getStrokes(), history.status);
+  }, [redraw, history, onChange]);
+
+  const appendSamples = useCallback((event: PointerEvent) => {
+    const active = activeRef.current;
+    const canvas = canvasRef.current;
+    if (!active || !canvas || active.pointerId !== event.pointerId || event.pointerType === 'touch') return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const coalesced = event.getCoalescedEvents?.();
+    // Include the dispatching event as well; duplicate coordinates are ignored.
+    const samples = coalesced?.length ? [...coalesced, event] : [event];
+    for (const sample of samples) {
+      const point = toDocumentPoint(sample.clientX, sample.clientY, rect);
+      const last = active.stroke.points[active.stroke.points.length - 1];
+      if (point.x === last.x && point.y === last.y) continue;
+      active.stroke.points.push(point);
+      drawSegment(ctx, active.stroke, last, point);
+    }
+  }, []);
+
+  const finish = useCallback(() => {
+    const active = activeRef.current;
+    if (!active) return;
+    // Clear first: releasing capture can synchronously trigger lostpointercapture.
+    activeRef.current = null;
+    const canvas = canvasRef.current;
+    if (canvas?.hasPointerCapture(active.pointerId)) canvas.releasePointerCapture(active.pointerId);
+    history.commit(active.stroke);
+    notify();
+  }, [history, notify]);
+
+  // Keep already sampled ink on interruption, without inventing a cancellation endpoint.
+  useEffect(() => {
+    const hide = () => { if (document.visibilityState === 'hidden') finish(); };
+    window.addEventListener('blur', finish);
+    document.addEventListener('visibilitychange', hide);
+    return () => {
+      window.removeEventListener('blur', finish);
+      document.removeEventListener('visibilitychange', hide);
+    };
+  }, [finish]);
+
+  const startDrawing = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (event.button !== 0 || event.pointerType === 'touch' || activeRef.current) return;
+    event.preventDefault();
+    const canvas = event.currentTarget;
+    // Capture a real active pointer before starting a stroke.
+    canvas.setPointerCapture(event.pointerId);
+    const point = toDocumentPoint(event.clientX, event.clientY, canvas.getBoundingClientRect());
+    const stroke: Stroke = { tool, size: tool === 'pen' ? penSize : eraserSize, color: '#000000', points: [point] };
+    activeRef.current = { pointerId: event.pointerId, stroke };
+    const ctx = canvas.getContext('2d');
+    if (ctx) drawStroke(ctx, stroke);
+    onStart();
   };
+  const draw = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (activeRef.current?.pointerId !== event.pointerId || event.pointerType === 'touch') return;
+    event.preventDefault();
+    appendSamples(event.nativeEvent);
+  };
+  const stopDrawing = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (activeRef.current?.pointerId !== event.pointerId || event.pointerType === 'touch') return;
+    if (event.type === 'pointerup') appendSamples(event.nativeEvent);
+    finish();
+  };
+
+  const actions: CanvasHandle = {
+    undo() { finish(); history.undo(); notify(); },
+    redo() { finish(); history.redo(); notify(); },
+    clear() { finish(); history.clear(); notify(); },
+    reset() { finish(); history.reset(); notify(); },
+    finish,
+    exportPNG(background: ExportBackground) { finish(); return exportDrawing(history.getStrokes(), background); },
+  };
+  return { canvasRef, startDrawing, draw, stopDrawing, actions };
 }

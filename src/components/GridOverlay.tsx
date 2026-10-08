@@ -1,147 +1,31 @@
+import { memo } from 'react';
 import { GRID_COLORS } from '../types';
 import type { GridSettings } from '../types';
 
-interface GridOverlayProps {
-  width: number;
-  height: number;
-  settings: GridSettings;
-  className?: string;
-}
-
-export const GridOverlay: React.FC<GridOverlayProps> = ({
-  width,
-  height,
-  settings,
-  className = '',
-}) => {
+interface Props { width: number; height: number; settings: GridSettings }
+export const GridOverlay = memo(function GridOverlay({ width, height, settings }: Props) {
   if (!settings.enabled) return null;
-
-  const { multiplier, colorKey } = settings;
-  const color = GRID_COLORS[colorKey];
-  
-  // Base 4x5 grid scaled by multiplier
-  const baseX = 4;
-  const baseY = 5;
-  const divisionsX = baseX * multiplier;
-  const divisionsY = baseY * multiplier;
-  
-  // Calculate main grid lines (solid)
-  const verticalLines = [];
-  const horizontalLines = [];
-  
-  // Calculate sub grid lines (dashed)
-  const subDivisionsX = divisionsX * 2;
-  const subDivisionsY = divisionsY * 2;
-  const subVerticalLines = [];
-  const subHorizontalLines = [];
-  
-  // Main vertical lines (X divisions)
-  for (let i = 1; i < divisionsX; i++) {
-    const x = (width / divisionsX) * i;
-    
-    verticalLines.push(
-      <line
-        key={`v-${i}`}
-        x1={x}
-        y1={0}
-        x2={x}
-        y2={height}
-        stroke={color}
-        strokeWidth={2}
-      />
-    );
+  const columns = 4 * settings.multiplier, rows = 5 * settings.multiplier;
+  const color = GRID_COLORS[settings.colorKey];
+  const lines = [];
+  // Sub-grid lines are always present whenever the grid is enabled.
+  for (let i = 1; i < columns * 2; i++) {
+    const sub = i % 2 !== 0;
+    lines.push(<line key={`v${i}`} data-subgrid={sub || undefined}
+      x1={width * i / (columns * 2)} x2={width * i / (columns * 2)} y1={0} y2={height}
+      strokeWidth={settings.lineWidth * (sub ? 0.65 : 1)} opacity={sub ? 0.42 : 0.65}
+      strokeDasharray={sub ? '3 3' : undefined} />);
   }
-  
-  // Main horizontal lines (Y divisions)
-  for (let i = 1; i < divisionsY; i++) {
-    const y = (height / divisionsY) * i;
-    
-    horizontalLines.push(
-      <line
-        key={`h-${i}`}
-        x1={0}
-        y1={y}
-        x2={width}
-        y2={y}
-        stroke={color}
-        strokeWidth={2}
-      />
-    );
+  for (let i = 1; i < rows * 2; i++) {
+    const sub = i % 2 !== 0;
+    lines.push(<line key={`h${i}`} data-subgrid={sub || undefined}
+      x1={0} x2={width} y1={height * i / (rows * 2)} y2={height * i / (rows * 2)}
+      strokeWidth={settings.lineWidth * (sub ? 0.65 : 1)} opacity={sub ? 0.42 : 0.65}
+      strokeDasharray={sub ? '3 3' : undefined} />);
   }
-  
-  // Sub vertical lines
-  for (let i = 1; i < subDivisionsX; i++) {
-    if (i % 2 === 0) continue;
-    
-    const x = (width / subDivisionsX) * i;
-    
-    subVerticalLines.push(
-      <line
-        key={`sv-${i}`}
-        x1={x}
-        y1={0}
-        x2={x}
-        y2={height}
-        stroke={color}
-        strokeWidth={2.5}
-        strokeDasharray="4,4"
-        opacity={0.6}
-      />
-    );
-  }
-  
-  // Sub horizontal lines
-  for (let i = 1; i < subDivisionsY; i++) {
-    if (i % 2 === 0) continue;
-    
-    const y = (height / subDivisionsY) * i;
-    
-    subHorizontalLines.push(
-      <line
-        key={`sh-${i}`}
-        x1={0}
-        y1={y}
-        x2={width}
-        y2={y}
-        stroke={color}
-        strokeWidth={2.5}
-        strokeDasharray="4,4"
-        opacity={0.6}
-      />
-    );
-  }
-
-  return (
-    <svg
-      className={`grid-overlay ${className}`}
-      width={width}
-      height={height}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        pointerEvents: 'none',
-        zIndex: 10,
-      }}
-    >
-      {/* Border */}
-      <rect
-        x={0}
-        y={0}
-        width={width}
-        height={height}
-        fill="none"
-        stroke={color}
-        strokeWidth={3}
-      />
-      
-      {/* Sub grid lines (dashed, behind main lines) */}
-      {subVerticalLines}
-      {subHorizontalLines}
-      
-      {/* Main grid lines (solid) */}
-      {verticalLines}
-      {horizontalLines}
-    </svg>
-  );
-};
+  return <svg className="grid-overlay" width={width} height={height} aria-hidden="true" stroke={color}>
+    {lines}
+    <rect x={0.5} y={0.5} width={Math.max(0, width - 1)} height={Math.max(0, height - 1)}
+      fill="none" strokeWidth={settings.lineWidth} opacity={0.7} />
+  </svg>;
+});

@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Test output
+.test-build/
+test-results/
+__pycache__/

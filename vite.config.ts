@@ -1,19 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/ipad-grid-tracing/', // リポジトリ名と一致
-  server: {
-    host: true,
-    port: 5173,
-    hmr: {
-      clientPort: 5173,
-    },
-  },
+  base: '/ipad-grid-tracing/',
+  server: { host: true, port: 5173 },
   build: {
-    target: 'esnext',
+    target: ['safari16.4', 'chrome111', 'firefox114'],
     outDir: 'dist',
     assetsDir: 'assets',
   },
