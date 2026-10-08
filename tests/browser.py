@@ -17,6 +17,7 @@ import zlib
 
 from playwright.sync_api import sync_playwright, expect
 from browser_diagnostics import install_diagnostics, collect_diagnostics
+from brush_browser import brush_width_test
 
 RESULTS = Path('test-results')
 RESULTS.mkdir(exist_ok=True)
@@ -260,6 +261,7 @@ def invalid_image_test(page, _):
     initial=stored(page)['reference']
     page.get_by_label('参考画像ファイル').set_input_files({'name':'broken.png','mimeType':'image/png','buffer':b'not an image'})
     expect(page.locator('.status-bar [role="status"]')).to_contain_text('画像を読み込めない')
+    settle(page)  # Error/status text may resize the available paper viewport.
     assert alpha(page,250,200)>0
     save_finished(page)
     assert stored(page)['reference']==initial
@@ -315,7 +317,7 @@ def two_finger_test(page, browser_name):
     assert abs(anchor_x-260)<2 and abs(anchor_y-240)<2,t
 
 
-CASES=[history_test,resize_test,foreign_pointer_test,final_endpoint_test,coalesced_test,persistence_test,export_test,focus_test,invalid_image_test,corrupt_restore_test,two_finger_test]
+CASES=[brush_width_test,history_test,resize_test,foreign_pointer_test,final_endpoint_test,coalesced_test,persistence_test,export_test,focus_test,invalid_image_test,corrupt_restore_test,two_finger_test]
 
 
 def main():

@@ -88,7 +88,7 @@ test('angle wrap remains continuous across minus/plus pi', () => {
   assert.deepEqual(center({ x: 0, y: 2 }, { x: 2, y: 4 }), { x: 1, y: 3 });
 });
 test('brush widths and dots do not depend on supplied pressure', () => {
-  const ctx = { beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, fill() {}, arc(x, y, radius) { this.radius = radius; } };
+  const ctx = { save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, fill() {}, arc(x, y, radius) { this.radius = radius; } };
   for (const pressure of [0, 0.49, 0.5, 0.51, 1]) {
     drawStroke(ctx, { ...stroke(), points: [{ x: 2, y: 2, pressure }] });
     assert.equal(ctx.lineWidth, 4);
@@ -98,7 +98,7 @@ test('brush widths and dots do not depend on supplied pressure', () => {
   }
 });
 test('eraser rendering uses destination-out', () => {
-  const ctx = { beginPath() {}, moveTo() {}, lineTo() {}, stroke() {} };
+  const ctx = { save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {} };
   drawStroke(ctx, stroke(1, 'eraser'));
   assert.equal(ctx.globalCompositeOperation, 'destination-out');
   drawStroke(ctx, stroke()); assert.equal(ctx.globalCompositeOperation, 'source-over');

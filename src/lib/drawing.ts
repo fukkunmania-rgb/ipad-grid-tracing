@@ -43,25 +43,30 @@ function setBrush(ctx: CanvasRenderingContext2D, stroke: Stroke, scale: number) 
   ctx.fillStyle = stroke.color;
 }
 export function drawSegment(ctx: CanvasRenderingContext2D, stroke: Stroke, a: Point, b: Point, scale = 1) {
-  setBrush(ctx, stroke, scale);
+  ctx.save();
   ctx.beginPath();
   ctx.moveTo(a.x * scale, a.y * scale);
   ctx.lineTo(b.x * scale, b.y * scale);
+  setBrush(ctx, stroke, scale);
   ctx.stroke();
+  ctx.restore();
 }
 export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke, scale = 1) {
   if (!stroke.points.length) return;
-  setBrush(ctx, stroke, scale);
+  ctx.save();
   ctx.beginPath();
   const first = stroke.points[0];
   if (stroke.points.length === 1) {
     ctx.arc(first.x * scale, first.y * scale, stroke.size * scale / 2, 0, Math.PI * 2);
+    setBrush(ctx, stroke, scale);
     ctx.fill();
   } else {
     ctx.moveTo(first.x * scale, first.y * scale);
     for (const point of stroke.points.slice(1)) ctx.lineTo(point.x * scale, point.y * scale);
+    setBrush(ctx, stroke, scale);
     ctx.stroke();
   }
+  ctx.restore();
 }
 export function renderDrawing(canvas: HTMLCanvasElement, strokes: Stroke[]) {
   const ctx = canvas.getContext('2d');

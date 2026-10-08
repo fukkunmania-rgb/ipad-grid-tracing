@@ -4,7 +4,7 @@ import { drawStroke } from '../.test-build/lib/drawing.js';
 
 test('bitmap scaling applies once to both coordinates and fixed line width', () => {
   const points = [];
-  const ctx = { beginPath() {}, moveTo(x, y) { points.push([x,y]); }, lineTo(x, y) { points.push([x,y]); }, stroke() {} };
+  const ctx = { save() {}, restore() {}, beginPath() {}, moveTo(x, y) { points.push([x,y]); }, lineTo(x, y) { points.push([x,y]); }, stroke() {} };
   const stroke = { tool: 'pen', size: 4, color: '#000000', points: [{ x: 100, y: 20 }, { x: 105, y: 40 }] };
   drawStroke(ctx, stroke, 1.575);
   assert.equal(ctx.lineWidth, 6.3);
