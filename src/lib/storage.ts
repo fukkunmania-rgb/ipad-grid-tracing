@@ -1,5 +1,5 @@
 import type { Session } from '../types';
-import { isSession } from './session-schema';
+import { encodeSession, decodeSession } from './storage-codec';
 
 let database: Promise<IDBDatabase> | undefined;
 function openDatabase(): Promise<IDBDatabase> {
@@ -28,17 +28,17 @@ export async function loadSession(): Promise<Session | null> {
     request.onerror = () => reject(request.error);
   });
   if (value === undefined) return null;
-  if (!isSession(value)) throw new Error('保存データが破損しているか、未対応のバージョンになっている');
-  return value;
+  return decodeSession(value);
 }
 // Serialize writes so a slow old snapshot cannot finish after a newer one.
 let writeQueue: Promise<void> = Promise.resolve();
 export function saveSession(session: Session): Promise<void> {
   const next = writeQueue.catch(() => {}).then(async () => {
+    const snapshot = await encodeSession(session);
     const db = await openDatabase();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('sessions', 'readwrite');
-      tx.objectStore('sessions').put(session, 'latest');
+      tx.objectStore('sessions').put(snapshot, 'latest');
       tx.oncomplete = () => resolve();
       tx.onabort = () => reject(tx.error ?? new Error('自動保存が中断された'));
       tx.onerror = () => reject(tx.error);

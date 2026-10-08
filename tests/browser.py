@@ -16,6 +16,7 @@ import urllib.request
 import zlib
 
 from playwright.sync_api import sync_playwright, expect
+from browser_diagnostics import install_diagnostics, collect_diagnostics
 
 RESULTS = Path('test-results')
 RESULTS.mkdir(exist_ok=True)
@@ -90,7 +91,7 @@ def stored(page):
       const request=indexedDB.open('grid-tracing',1);
       request.onsuccess=()=>{ const db=request.result; const tx=db.transaction('sessions','readonly');
         const get=tx.objectStore('sessions').get('latest');
-        get.onsuccess=()=>{const s=get.result; resolve(s ? {...s,reference:s.reference ? {...s.reference,blob:{size:s.reference.blob.size}} : null} : null);};
+        get.onsuccess=()=>{const s=get.result; resolve(s ? {...s,reference:s.reference ? {...s.reference,bytes:undefined,blob:{size:s.reference.blob?.size ?? s.reference.bytes?.byteLength}} : null} : null);};
         tx.oncomplete=()=>db.close(); get.onerror=()=>reject(get.error); };
       request.onerror=()=>reject(request.error);
     })''')
@@ -276,7 +277,7 @@ def corrupt_restore_test(page, _):
       const r=indexedDB.open('grid-tracing',1);r.onsuccess=()=>{const db=r.result,tx=db.transaction('sessions','readwrite');
       tx.objectStore('sessions').put({version:999},'latest');tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);};
     })''')
-    page.reload()
+    page.goto(BASE)
     expect(page.get_by_role('heading',name='前回の練習を復元できない')).to_be_visible()
     assert stored(page)['version']==999
     page.get_by_role('button',name='復元せずに新しく始める',exact=True).click()
@@ -336,6 +337,7 @@ def main():
                 browser=getattr(playwright,name).launch(**options)
                 for case in CASES:
                     context=browser.new_context(viewport={'width':1194,'height':834},device_scale_factor=2,has_touch=True,accept_downloads=True)
+                    install_diagnostics(context)
                     page=context.new_page();errors=[]
                     page.on('pageerror',lambda error:errors.append(str(error)))
                     page.on('dialog',lambda dialog:dialog.accept())
@@ -346,7 +348,7 @@ def main():
                         assert not errors,errors
                         record.update(status='skip' if note else 'pass',note=note)
                     except Exception:
-                        record.update(status='fail',error=traceback.format_exc(),page_errors=errors)
+                        record.update(status='fail',error=traceback.format_exc(),page_errors=errors,diagnostics=collect_diagnostics(page))
                         page.screenshot(path=str(RESULTS/f'{name}-{case.__name__}-failed.png'))
                     finally:
                         report.append(record)

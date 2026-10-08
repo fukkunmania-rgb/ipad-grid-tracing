@@ -4,5 +4,5 @@
     "lib": ["ES2022", "DOM"], "types": [], "strict": true,
     "outDir": ".test-build", "rootDir": "src", "skipLibCheck": true
   },
-  "include": ["src/types/index.ts", "src/lib/geometry.ts", "src/lib/drawing.ts", "src/lib/session-schema.ts"]
+  "include": ["src/types/index.ts", "src/lib/geometry.ts", "src/lib/drawing.ts", "src/lib/session-schema.ts", "src/lib/storage-codec.ts"]
 }
